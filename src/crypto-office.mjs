@@ -66,6 +66,10 @@ function encrypt(secretKey, value) {
   return Buffer.concat([nonce, encrypted]).toString("base64");
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function authorization(config) {
   const phraseBody = await request(
     `${config.apiBaseUrl}/get-phrase`,
@@ -101,7 +105,7 @@ export function createCryptoOfficeClient(config) {
         const requestHash = hashBody?.data?.request_hash ?? hashBody?.request_hash;
         if (!requestHash) throw new ProviderError("Provider response has no request hash");
 
-        return await request(
+        await request(
           `${config.apiBaseUrl}${config.amlPath}`,
           {
             method: "POST",
@@ -120,6 +124,28 @@ export function createCryptoOfficeClient(config) {
           },
           config.timeoutMs,
         );
+
+        const deadline = Date.now() + config.timeoutMs;
+        const resultUrl = new URL(`${config.apiBaseUrl}/aml`);
+        resultUrl.searchParams.set("request_hash", requestHash);
+
+        while (Date.now() < deadline) {
+          await delay(1000);
+          const result = await request(
+            resultUrl,
+            {
+              headers: {
+                Accept: "application/json",
+                Authorization: await authorization(config),
+              },
+            },
+            Math.max(1000, deadline - Date.now()),
+          );
+          const providerStatus = result?.data?.status;
+          if (providerStatus === 50 || providerStatus === 40) return result;
+        }
+
+        throw new ProviderError("Provider result timed out");
       } catch (error) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError(
