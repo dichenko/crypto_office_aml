@@ -115,7 +115,6 @@ export function createCryptoOfficeClient(config) {
               blockchain: "tron",
               balance_coin: 1,
               service: config.amlService,
-              txid: null,
               request_hash: requestHash,
             }),
           },
