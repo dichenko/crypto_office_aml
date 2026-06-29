@@ -6,7 +6,7 @@ function required(name, env) {
 
 export function loadConfig(env = process.env) {
   const port = Number(env.PORT ?? 8000);
-  const timeoutMs = Number(env.CRYPTO_OFFICE_TIMEOUT_MS ?? 25000);
+  const timeoutMs = Number(env.CRYPTO_OFFICE_TIMEOUT_MS ?? 120000);
   const amlService = (env.CRYPTO_OFFICE_AML_SERVICE ?? "crystal").trim().toLowerCase();
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {

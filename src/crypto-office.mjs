@@ -70,6 +70,16 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function findOperation(value, requestHash) {
+  if (value == null || typeof value !== "object") return null;
+  if (value.request_hash === requestHash) return value;
+  for (const child of Object.values(value)) {
+    const found = findOperation(child, requestHash);
+    if (found) return found;
+  }
+  return null;
+}
+
 async function authorization(config) {
   const phraseBody = await request(
     `${config.apiBaseUrl}/get-phrase`,
@@ -141,7 +151,8 @@ export function createCryptoOfficeClient(config) {
             },
             Math.max(1000, deadline - Date.now()),
           );
-          const providerStatus = result?.data?.status;
+          const operation = findOperation(result, requestHash);
+          const providerStatus = Number(operation?.status ?? result?.data?.status);
           if (providerStatus === 50 || providerStatus === 40) return result;
         }
 
