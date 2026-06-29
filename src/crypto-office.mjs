@@ -8,6 +8,32 @@ export class ProviderError extends Error {
   }
 }
 
+function validationSummary(body) {
+  const messages = [];
+
+  function visit(value, key = "") {
+    if (messages.length >= 8 || value == null) return;
+    if (typeof value === "string") {
+      if (key === "message" || key === "data" || key === "error") {
+        messages.push(value.slice(0, 160));
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, key);
+      return;
+    }
+    if (typeof value === "object") {
+      for (const [childKey, child] of Object.entries(value)) {
+        visit(child, childKey);
+      }
+    }
+  }
+
+  visit(body?.data?.errors ?? body?.errors);
+  return messages.length ? `: ${messages.join("; ")}` : "";
+}
+
 async function request(url, options, timeoutMs) {
   const response = await fetch(url, {
     ...options,
@@ -22,7 +48,9 @@ async function request(url, options, timeoutMs) {
     throw new ProviderError(`Provider returned non-JSON response (HTTP ${response.status})`);
   }
   if (!response.ok) {
-    throw new ProviderError(`Provider returned HTTP ${response.status}`);
+    throw new ProviderError(
+      `Provider returned HTTP ${response.status}${validationSummary(json)}`,
+    );
   }
   return json;
 }
