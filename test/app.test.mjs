@@ -87,6 +87,21 @@ test("returns pending job status", async () => {
   });
 });
 
+test("accepts Crypto Office AML job IDs with an a_ prefix", async () => {
+  const jobId = "a_e3fe1622415d87d7f3bff077675ff0ff";
+  const base = await start({
+    createCheck: async () => assert.fail("create called"),
+    getResult: async (actualJobId) => {
+      assert.equal(actualJobId, jobId);
+      return { done: false, providerStatus: 1 };
+    },
+  });
+  const response = await fetch(`${base}/v1/aml/check/${jobId}`, {
+    headers: { "x-internal-api-key": "secret" },
+  });
+  assert.equal(response.status, 202);
+});
+
 test("returns completed provider JSON unchanged", async () => {
   const raw = { status: true, data: { result: [{ riskScore: 0.42 }] } };
   const base = await start({
