@@ -85,6 +85,9 @@ export function createCryptoOfficeClient(config) {
             body: JSON.stringify({
               address,
               blockchain: "tron",
+              balance_coin: 1,
+              service: "bitok",
+              txid: null,
               request_hash: requestHash,
             }),
           },
