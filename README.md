@@ -17,7 +17,7 @@ cp .env.example .env
 `INTERNAL_API_KEY`. `blockchain` во внутреннем API необязателен; если указан,
 поддерживается только `TRX` (провайдеру отправляется `tron`).
 
-Путь AML API по умолчанию — `/aml/check`. Если путь в выданной вам версии API
+Путь AML API по умолчанию — `/aml/create`. Если путь в выданной вам версии API
 Crypto Office отличается, задайте `CRYPTO_OFFICE_AML_PATH` в `.env`.
 
 ## Запуск

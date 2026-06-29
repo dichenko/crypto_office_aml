@@ -22,6 +22,6 @@ export function loadConfig(env = process.env) {
     secretKey: required("CRYPTO_OFFICE_SECRET_KEY", env),
     internalApiKey: required("INTERNAL_API_KEY", env),
     apiBaseUrl: (env.CRYPTO_OFFICE_API_BASE_URL ?? "https://public.crypto-office.com/api").replace(/\/+$/, ""),
-    amlPath: env.CRYPTO_OFFICE_AML_PATH ?? "/aml/check",
+    amlPath: env.CRYPTO_OFFICE_AML_PATH ?? "/aml/create",
   };
 }
