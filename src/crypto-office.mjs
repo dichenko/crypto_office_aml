@@ -2,9 +2,10 @@ import sodium from "sodium-native";
 import { Buffer } from "node:buffer";
 
 export class ProviderError extends Error {
-  constructor(message, cause) {
+  constructor(message, cause, status = null) {
     super(message, { cause });
     this.name = "ProviderError";
+    this.status = status;
   }
 }
 
@@ -50,6 +51,8 @@ async function request(url, options, timeoutMs) {
   if (!response.ok) {
     throw new ProviderError(
       `Provider returned HTTP ${response.status}${validationSummary(json)}`,
+      undefined,
+      response.status,
     );
   }
   return json;
@@ -162,6 +165,9 @@ export function createCryptoOfficeClient(config) {
           result,
         };
       } catch (error) {
+        if (error instanceof ProviderError && error.status === 409) {
+          return { done: false, providerStatus: null, result: null };
+        }
         if (error instanceof ProviderError) throw error;
         throw new ProviderError(
           error?.name === "TimeoutError" ? "Provider request timed out" : "Provider request failed",
