@@ -79,6 +79,18 @@ function findOperation(value, requestHash) {
   return null;
 }
 
+function collectStatuses(value, statuses = []) {
+  if (statuses.length >= 20 || value == null || typeof value !== "object") {
+    return statuses;
+  }
+  if ("request_hash" in value && "status" in value) {
+    const status = Number(value.status);
+    if (!Number.isNaN(status)) statuses.push(status);
+  }
+  for (const child of Object.values(value)) collectStatuses(child, statuses);
+  return statuses;
+}
+
 async function authorization(config) {
   const phraseBody = await request(
     `${config.apiBaseUrl}/get-phrase`,
@@ -146,6 +158,7 @@ export function createCryptoOfficeClient(config) {
     async getResult(requestHash) {
       try {
         const resultUrl = new URL(`${config.apiBaseUrl}/aml`);
+        resultUrl.searchParams.set("hash", requestHash);
         resultUrl.searchParams.set("request_hash", requestHash);
         const result = await request(
           resultUrl,
@@ -162,11 +175,17 @@ export function createCryptoOfficeClient(config) {
         return {
           done: providerStatus === 50 || providerStatus === 40,
           providerStatus: Number.isNaN(providerStatus) ? null : providerStatus,
+          observedStatuses: collectStatuses(result),
           result,
         };
       } catch (error) {
         if (error instanceof ProviderError && error.status === 409) {
-          return { done: false, providerStatus: null, result: null };
+          return {
+            done: false,
+            providerStatus: null,
+            observedStatuses: [],
+            result: null,
+          };
         }
         if (error instanceof ProviderError) throw error;
         throw new ProviderError(

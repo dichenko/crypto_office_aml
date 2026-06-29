@@ -7,7 +7,7 @@ afterEach(() => server?.close());
 
 async function start(client = {
   createCheck: async () => "m_12345678",
-  getResult: async () => ({ done: false, providerStatus: 1 }),
+  getResult: async () => ({ done: false, providerStatus: 1, observedStatuses: [1] }),
 }) {
   server = createServer({ internalApiKey: "secret", client, logger: { info() {}, error() {} } });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -74,7 +74,7 @@ test("maps provider errors to 502", async () => {
 test("returns pending job status", async () => {
   const base = await start({
     createCheck: async () => assert.fail("create called"),
-    getResult: async () => ({ done: false, providerStatus: 1 }),
+    getResult: async () => ({ done: false, providerStatus: 1, observedStatuses: [1] }),
   });
   const response = await fetch(`${base}/v1/aml/check/m_abcdefgh`, {
     headers: { "x-internal-api-key": "secret" },
@@ -84,6 +84,7 @@ test("returns pending job status", async () => {
     job_id: "m_abcdefgh",
     status: "pending",
     provider_status: 1,
+    observed_provider_statuses: [1],
   });
 });
 
@@ -93,7 +94,7 @@ test("accepts Crypto Office AML job IDs with an a_ prefix", async () => {
     createCheck: async () => assert.fail("create called"),
     getResult: async (actualJobId) => {
       assert.equal(actualJobId, jobId);
-      return { done: false, providerStatus: 1 };
+      return { done: false, providerStatus: 1, observedStatuses: [1] };
     },
   });
   const response = await fetch(`${base}/v1/aml/check/${jobId}`, {

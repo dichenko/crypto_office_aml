@@ -74,6 +74,7 @@ export function createServer({ internalApiKey, client, logger = console }) {
               job_id: jobId,
               status: "pending",
               provider_status: result.providerStatus,
+              observed_provider_statuses: result.observedStatuses,
             });
           }
           status = 200;
