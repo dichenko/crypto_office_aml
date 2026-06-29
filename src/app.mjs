@@ -44,13 +44,51 @@ export function createServer({ internalApiKey, client, logger = console }) {
         status = 200;
         return send(response, status, { status: "ok" });
       }
-      if (request.method !== "POST" || endpoint !== "/v1/aml/check") {
+      const resultMatch = endpoint.match(/^\/v1\/aml\/check\/([^/]+)$/);
+      const isCreate = request.method === "POST" && endpoint === "/v1/aml/check";
+      const isResult = request.method === "GET" && resultMatch;
+      if (!isCreate && !isResult) {
         status = 404;
         return send(response, status, { error: "NOT_FOUND" });
       }
       if (!authorized(request.headers["x-internal-api-key"], internalApiKey)) {
         status = 401;
         return send(response, status, { error: "UNAUTHORIZED" });
+      }
+
+      if (isResult) {
+        const jobId = decodeURIComponent(resultMatch[1]);
+        if (!/^m_[A-Za-z0-9_-]{8,200}$/.test(jobId)) {
+          status = 400;
+          return send(response, status, {
+            error: "VALIDATION_ERROR",
+            message: "Invalid job_id",
+          });
+        }
+        const providerStarted = Date.now();
+        try {
+          const result = await client.getResult(jobId);
+          if (!result.done) {
+            status = 202;
+            return send(response, status, {
+              job_id: jobId,
+              status: "pending",
+              provider_status: result.providerStatus,
+            });
+          }
+          status = 200;
+          return send(response, status, result.result);
+        } catch (error) {
+          status = 502;
+          logger.error(JSON.stringify({
+            time: new Date().toISOString(), endpoint, status,
+            providerDurationMs: Date.now() - providerStarted, error: error.message,
+          }));
+          return send(response, status, {
+            error: "CRYPTO_OFFICE_ERROR",
+            message: "AML provider request failed",
+          });
+        }
       }
 
       let body;
@@ -72,13 +110,13 @@ export function createServer({ internalApiKey, client, logger = console }) {
 
       const providerStarted = Date.now();
       try {
-        const result = await client.checkAddress(address);
-        status = 200;
+        const jobId = await client.createCheck(address);
+        status = 202;
         logger.info(JSON.stringify({
           time: new Date().toISOString(), endpoint, status,
           address: maskedAddress(address), providerDurationMs: Date.now() - providerStarted,
         }));
-        return send(response, status, result);
+        return send(response, status, { job_id: jobId, status: "pending" });
       } catch (error) {
         status = 502;
         logger.error(JSON.stringify({

@@ -1,11 +1,9 @@
 # Crypto Office AML API
 
-Внутренний HTTP-сервис для AML-проверки TRON-адресов из n8n. Успешный ответ
-Crypto Office возвращается без изменения JSON-структуры. Порт на Docker-хост
+Внутренний асинхронный HTTP-сервис для AML-проверки TRON-адресов из n8n.
+Создание проверки быстро возвращает `job_id`, а финальный ответ Crypto Office
+получается отдельным запросом без изменения JSON-структуры. Порт на Docker-хост
 намеренно не публикуется.
-
-Сервис создаёт AML-проверку и ожидает её итоговый статус, поэтому ответ может
-занять до значения `CRYPTO_OFFICE_TIMEOUT_MS` (по умолчанию 120 секунд).
 
 ## Требования и настройка
 
@@ -61,8 +59,21 @@ docker run --rm --network n8n_default curlimages/curl:8.12.1 \
   -d '{"address":"TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z","blockchain":"TRX"}'
 ```
 
-В n8n используйте HTTP Request node с теми же URL, заголовками и JSON-телом.
-Ключ храните в n8n Credentials или переменных окружения, а не в workflow.
+Ответ создания имеет HTTP-статус `202`:
+
+```json
+{"job_id":"m_...","status":"pending"}
+```
+
+Результат проверяется отдельным запросом:
+
+```bash
+curl -H 'X-Internal-Api-Key: replace-with-INTERNAL_API_KEY' \
+  http://crypto-office-aml-api:8000/v1/aml/check/m_...
+```
+
+Пока проверка выполняется, endpoint возвращает `202` и `status: pending`.
+После завершения он возвращает `200` и исходный JSON Crypto Office.
 
 ## Локальные тесты
 

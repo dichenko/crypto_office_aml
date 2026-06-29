@@ -5,14 +5,20 @@ import { createServer } from "../src/app.mjs";
 let server;
 afterEach(() => server?.close());
 
-async function start(client = { checkAddress: async () => ({ data: { riskScore: 0.1 } }) }) {
+async function start(client = {
+  createCheck: async () => "m_12345678",
+  getResult: async () => ({ done: false, providerStatus: 1 }),
+}) {
   server = createServer({ internalApiKey: "secret", client, logger: { info() {}, error() {} } });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return `http://127.0.0.1:${server.address().port}`;
 }
 
 test("health is public and does not call provider", async () => {
-  const base = await start({ checkAddress: async () => assert.fail("provider called") });
+  const base = await start({
+    createCheck: async () => assert.fail("provider called"),
+    getResult: async () => assert.fail("provider called"),
+  });
   const response = await fetch(`${base}/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "ok" });
@@ -34,23 +40,25 @@ test("validates address and blockchain", async () => {
   assert.equal(response.status, 400);
 });
 
-test("returns provider JSON without changing its structure", async () => {
-  const raw = { status: true, data: { result: [{ riskScore: 0.42 }] } };
-  const base = await start({ checkAddress: async (address) => {
+test("creates an asynchronous AML job", async () => {
+  const base = await start({ createCheck: async (address) => {
     assert.equal(address, "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z");
-    return raw;
-  } });
+    return "m_abcdefgh";
+  }, getResult: async () => assert.fail("result called") });
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
     body: JSON.stringify({ address: "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z", blockchain: "TRX" }),
   });
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), raw);
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), { job_id: "m_abcdefgh", status: "pending" });
 });
 
 test("maps provider errors to 502", async () => {
-  const base = await start({ checkAddress: async () => { throw new Error("sensitive detail"); } });
+  const base = await start({
+    createCheck: async () => { throw new Error("sensitive detail"); },
+    getResult: async () => assert.fail("result called"),
+  });
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
@@ -61,4 +69,33 @@ test("maps provider errors to 502", async () => {
     error: "CRYPTO_OFFICE_ERROR",
     message: "AML provider request failed",
   });
+});
+
+test("returns pending job status", async () => {
+  const base = await start({
+    createCheck: async () => assert.fail("create called"),
+    getResult: async () => ({ done: false, providerStatus: 1 }),
+  });
+  const response = await fetch(`${base}/v1/aml/check/m_abcdefgh`, {
+    headers: { "x-internal-api-key": "secret" },
+  });
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), {
+    job_id: "m_abcdefgh",
+    status: "pending",
+    provider_status: 1,
+  });
+});
+
+test("returns completed provider JSON unchanged", async () => {
+  const raw = { status: true, data: { result: [{ riskScore: 0.42 }] } };
+  const base = await start({
+    createCheck: async () => assert.fail("create called"),
+    getResult: async () => ({ done: true, providerStatus: 50, result: raw }),
+  });
+  const response = await fetch(`${base}/v1/aml/check/m_abcdefgh`, {
+    headers: { "x-internal-api-key": "secret" },
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), raw);
 });

@@ -66,10 +66,6 @@ function encrypt(secretKey, value) {
   return Buffer.concat([nonce, encrypted]).toString("base64");
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function findOperation(value, requestHash) {
   if (value == null || typeof value !== "object") return null;
   if (value.request_hash === requestHash) return value;
@@ -97,7 +93,7 @@ async function authorization(config) {
 
 export function createCryptoOfficeClient(config) {
   return {
-    async checkAddress(address) {
+    async createCheck(address) {
       try {
         const auth = await authorization(config);
         const hashBody = await request(
@@ -134,29 +130,37 @@ export function createCryptoOfficeClient(config) {
           },
           config.timeoutMs,
         );
+        return requestHash;
+      } catch (error) {
+        if (error instanceof ProviderError) throw error;
+        throw new ProviderError(
+          error?.name === "TimeoutError" ? "Provider request timed out" : "Provider request failed",
+          error,
+        );
+      }
+    },
 
-        const deadline = Date.now() + config.timeoutMs;
+    async getResult(requestHash) {
+      try {
         const resultUrl = new URL(`${config.apiBaseUrl}/aml`);
         resultUrl.searchParams.set("request_hash", requestHash);
-
-        while (Date.now() < deadline) {
-          await delay(1000);
-          const result = await request(
-            resultUrl,
-            {
-              headers: {
-                Accept: "application/json",
-                Authorization: await authorization(config),
-              },
+        const result = await request(
+          resultUrl,
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: await authorization(config),
             },
-            Math.max(1000, deadline - Date.now()),
-          );
-          const operation = findOperation(result, requestHash);
-          const providerStatus = Number(operation?.status ?? result?.data?.status);
-          if (providerStatus === 50 || providerStatus === 40) return result;
-        }
-
-        throw new ProviderError("Provider result timed out");
+          },
+          config.timeoutMs,
+        );
+        const operation = findOperation(result, requestHash);
+        const providerStatus = Number(operation?.status ?? result?.data?.status);
+        return {
+          done: providerStatus === 50 || providerStatus === 40,
+          providerStatus: Number.isNaN(providerStatus) ? null : providerStatus,
+          result,
+        };
       } catch (error) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError(
