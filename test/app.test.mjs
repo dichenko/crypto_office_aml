@@ -35,20 +35,30 @@ test("validates address and blockchain", async () => {
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
-    body: JSON.stringify({ address: "abc", blockchain: "ETH" }),
+    body: JSON.stringify({ address: "abc", blockchain: "ETH", coin: "BTC" }),
   });
   assert.equal(response.status, 400);
 });
 
 test("creates an asynchronous AML job", async () => {
-  const base = await start({ createCheck: async (address) => {
-    assert.equal(address, "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z");
+  const base = await start({ createCheck: async (params) => {
+    assert.deepEqual(params, {
+      address: "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z",
+      blockchain: "tron",
+      balanceCoin: 1,
+      paymentCoin: 3,
+    });
     return "m_abcdefgh";
   }, getResult: async () => assert.fail("result called") });
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
-    body: JSON.stringify({ address: "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z", blockchain: "TRX" }),
+    body: JSON.stringify({
+      address: "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z",
+      blockchain: "TRX",
+      coin: "USDT",
+      payment_coin: 3,
+    }),
   });
   assert.equal(response.status, 202);
   assert.deepEqual(await response.json(), { job_id: "m_abcdefgh", status: "pending" });
@@ -62,7 +72,7 @@ test("maps provider errors to 502", async () => {
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
-    body: JSON.stringify({ address: "address" }),
+    body: JSON.stringify({ address: "address", blockchain: "BTC", coin: "BTC" }),
   });
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), {

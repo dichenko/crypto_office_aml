@@ -32,6 +32,15 @@ function maskedAddress(address) {
   return address.length <= 10 ? "***" : `${address.slice(0, 5)}...${address.slice(-5)}`;
 }
 
+const coinMappings = new Map([
+  ["TRX:TRX", { blockchain: "tron", balanceCoin: 4 }],
+  ["TRX:USDT", { blockchain: "tron", balanceCoin: 1 }],
+  ["ETH:ETH", { blockchain: "eth", balanceCoin: 6 }],
+  ["ETH:USDT", { blockchain: "eth", balanceCoin: 3 }],
+  ["ETH:USDC", { blockchain: "eth", balanceCoin: 9 }],
+  ["BTC:BTC", { blockchain: "bitcoin", balanceCoin: 7 }],
+]);
+
 export function createServer({ internalApiKey, client, logger = console }) {
   return http.createServer(async (request, response) => {
     const started = Date.now();
@@ -104,14 +113,42 @@ export function createServer({ internalApiKey, client, logger = console }) {
         status = 400;
         return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'address' is required" });
       }
-      if (body.blockchain !== undefined && String(body.blockchain).toUpperCase() !== "TRX") {
+      const blockchain = String(body.blockchain ?? "").trim().toUpperCase();
+      const coin = String(body.coin ?? "").trim().toUpperCase();
+      if (!blockchain || !coin) {
         status = 400;
-        return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'blockchain' must be 'TRX'" });
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Fields 'blockchain' and 'coin' are required",
+        });
+      }
+      const mapping = coinMappings.get(`${blockchain}:${coin}`);
+      if (!mapping) {
+        status = 400;
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Unsupported blockchain and coin combination",
+        });
+      }
+      const paymentCoin = body.payment_coin === undefined
+        ? undefined
+        : Number(body.payment_coin);
+      if (paymentCoin !== undefined && (!Number.isInteger(paymentCoin) || paymentCoin < 1)) {
+        status = 400;
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Field 'payment_coin' must be a positive integer",
+        });
       }
 
       const providerStarted = Date.now();
       try {
-        const jobId = await client.createCheck(address);
+        const jobId = await client.createCheck({
+          address,
+          blockchain: mapping.blockchain,
+          balanceCoin: mapping.balanceCoin,
+          paymentCoin,
+        });
         status = 202;
         logger.info(JSON.stringify({
           time: new Date().toISOString(), endpoint, status,

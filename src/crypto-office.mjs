@@ -108,7 +108,7 @@ async function authorization(config) {
 
 export function createCryptoOfficeClient(config) {
   return {
-    async createCheck(address) {
+    async createCheck({ address, blockchain, balanceCoin, paymentCoin }) {
       try {
         const auth = await authorization(config);
         const hashBody = await request(
@@ -128,11 +128,11 @@ export function createCryptoOfficeClient(config) {
 
         const form = new FormData();
         form.set("address", address);
-        form.set("blockchain", "tron");
-        form.set("balance_coin", "1");
+        form.set("blockchain", blockchain);
+        form.set("balance_coin", String(balanceCoin));
         form.set("service", config.amlService);
         form.set("request_hash", requestHash);
-        form.set("payment_coin", String(config.amlPaymentCoin));
+        form.set("payment_coin", String(paymentCoin ?? config.amlPaymentCoin));
 
         const createResult = await request(
           `${config.apiBaseUrl}${config.amlPath}`,

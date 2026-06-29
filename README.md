@@ -15,8 +15,12 @@ cp .env.example .env
 ```
 
 Заполните `CRYPTO_OFFICE_PUBLIC_KEY`, `CRYPTO_OFFICE_SECRET_KEY` и
-`INTERNAL_API_KEY`. `blockchain` во внутреннем API необязателен; если указан,
-поддерживается только `TRX` (провайдеру отправляется `tron`).
+`INTERNAL_API_KEY`. В каждом запросе обязательны `blockchain` и `coin`.
+Поддерживаются комбинации:
+
+- `TRX` + `TRX` или `USDT`;
+- `ETH` + `ETH`, `USDT` или `USDC`;
+- `BTC` + `BTC`.
 AML-провайдер задаётся через `CRYPTO_OFFICE_AML_SERVICE`: допустимы `crystal`
 (по умолчанию) и `bitok`.
 `CRYPTO_OFFICE_AML_PAYMENT_COIN` задаёт идентификатор валюты оплаты проверки
@@ -58,8 +62,12 @@ docker run --rm --network n8n_default curlimages/curl:8.12.1 \
   -X POST http://crypto-office-aml-api:8000/v1/aml/check \
   -H 'Content-Type: application/json' \
   -H 'X-Internal-Api-Key: replace-with-INTERNAL_API_KEY' \
-  -d '{"address":"TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z","blockchain":"TRX"}'
+  -d '{"address":"TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z","blockchain":"TRX","coin":"USDT","payment_coin":1}'
 ```
+
+`payment_coin` необязателен и задаёт валюту оплаты проверки по идентификатору
+Crypto Office. Если поле отсутствует, используется
+`CRYPTO_OFFICE_AML_PAYMENT_COIN` из `.env`.
 
 Ответ создания имеет HTTP-статус `202`:
 
