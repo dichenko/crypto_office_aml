@@ -1,0 +1,106 @@
+import { timingSafeEqual } from "node:crypto";
+import http from "node:http";
+
+const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
+
+function send(response, status, body) {
+  response.writeHead(status, jsonHeaders);
+  response.end(JSON.stringify(body));
+}
+
+function authorized(actual, expected) {
+  if (typeof actual !== "string") return false;
+  const left = Buffer.from(actual);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+async function readJson(request) {
+  let raw = "";
+  for await (const chunk of request) {
+    raw += chunk;
+    if (Buffer.byteLength(raw) > 16_384) throw new Error("BODY_TOO_LARGE");
+  }
+  try {
+    return JSON.parse(raw || "{}");
+  } catch {
+    throw new Error("INVALID_JSON");
+  }
+}
+
+function maskedAddress(address) {
+  return address.length <= 10 ? "***" : `${address.slice(0, 5)}...${address.slice(-5)}`;
+}
+
+export function createServer({ internalApiKey, client, logger = console }) {
+  return http.createServer(async (request, response) => {
+    const started = Date.now();
+    const endpoint = new URL(request.url, "http://localhost").pathname;
+    let status = 500;
+    let address;
+
+    try {
+      if (request.method === "GET" && endpoint === "/health") {
+        status = 200;
+        return send(response, status, { status: "ok" });
+      }
+      if (request.method !== "POST" || endpoint !== "/v1/aml/check") {
+        status = 404;
+        return send(response, status, { error: "NOT_FOUND" });
+      }
+      if (!authorized(request.headers["x-internal-api-key"], internalApiKey)) {
+        status = 401;
+        return send(response, status, { error: "UNAUTHORIZED" });
+      }
+
+      let body;
+      try {
+        body = await readJson(request);
+      } catch {
+        status = 400;
+        return send(response, status, { error: "VALIDATION_ERROR", message: "Request body must be valid JSON" });
+      }
+      address = typeof body.address === "string" ? body.address.trim() : "";
+      if (!address) {
+        status = 400;
+        return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'address' is required" });
+      }
+      if (body.blockchain !== undefined && String(body.blockchain).toUpperCase() !== "TRX") {
+        status = 400;
+        return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'blockchain' must be 'TRX'" });
+      }
+
+      const providerStarted = Date.now();
+      try {
+        const result = await client.checkAddress(address);
+        status = 200;
+        logger.info(JSON.stringify({
+          time: new Date().toISOString(), endpoint, status,
+          address: maskedAddress(address), providerDurationMs: Date.now() - providerStarted,
+        }));
+        return send(response, status, result);
+      } catch (error) {
+        status = 502;
+        logger.error(JSON.stringify({
+          time: new Date().toISOString(), endpoint, status,
+          address: maskedAddress(address), providerDurationMs: Date.now() - providerStarted,
+          error: error.message,
+        }));
+        return send(response, status, {
+          error: "CRYPTO_OFFICE_ERROR",
+          message: "AML provider request failed",
+        });
+      }
+    } catch (error) {
+      status = 500;
+      logger.error(JSON.stringify({ time: new Date().toISOString(), endpoint, status, error: error.message }));
+      send(response, status, { error: "INTERNAL_ERROR" });
+    } finally {
+      if (endpoint !== "/v1/aml/check" || status !== 200) {
+        logger.info(JSON.stringify({
+          time: new Date().toISOString(), endpoint, status, durationMs: Date.now() - started,
+        }));
+      }
+    }
+  });
+}
