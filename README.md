@@ -19,6 +19,8 @@ cp .env.example .env
 поддерживается только `TRX` (провайдеру отправляется `tron`).
 AML-провайдер задаётся через `CRYPTO_OFFICE_AML_SERVICE`: допустимы `crystal`
 (по умолчанию) и `bitok`.
+`CRYPTO_OFFICE_AML_PAYMENT_COIN` задаёт идентификатор валюты оплаты проверки
+(по умолчанию `3`, USDT ERC-20).
 
 Путь AML API по умолчанию — `/aml/create`. Если путь в выданной вам версии API
 Crypto Office отличается, задайте `CRYPTO_OFFICE_AML_PATH` в `.env`.

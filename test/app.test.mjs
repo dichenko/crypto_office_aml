@@ -103,6 +103,20 @@ test("accepts Crypto Office AML job IDs with an a_ prefix", async () => {
   assert.equal(response.status, 202);
 });
 
+test("accepts numeric AML check IDs returned by the current API", async () => {
+  const base = await start({
+    createCheck: async () => assert.fail("create called"),
+    getResult: async (jobId) => {
+      assert.equal(jobId, "28335");
+      return { done: false, providerStatus: 1, observedStatuses: [1] };
+    },
+  });
+  const response = await fetch(`${base}/v1/aml/check/28335`, {
+    headers: { "x-internal-api-key": "secret" },
+  });
+  assert.equal(response.status, 202);
+});
+
 test("returns completed provider JSON unchanged", async () => {
   const raw = { status: true, data: { result: [{ riskScore: 0.42 }] } };
   const base = await start({

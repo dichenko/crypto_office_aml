@@ -8,6 +8,7 @@ export function loadConfig(env = process.env) {
   const port = Number(env.PORT ?? 8000);
   const timeoutMs = Number(env.CRYPTO_OFFICE_TIMEOUT_MS ?? 120000);
   const amlService = (env.CRYPTO_OFFICE_AML_SERVICE ?? "crystal").trim().toLowerCase();
+  const amlPaymentCoin = Number(env.CRYPTO_OFFICE_AML_PAYMENT_COIN ?? 3);
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("PORT must be an integer between 1 and 65535");
@@ -18,6 +19,9 @@ export function loadConfig(env = process.env) {
   if (!["bitok", "crystal"].includes(amlService)) {
     throw new Error("CRYPTO_OFFICE_AML_SERVICE must be 'bitok' or 'crystal'");
   }
+  if (!Number.isInteger(amlPaymentCoin) || amlPaymentCoin < 1) {
+    throw new Error("CRYPTO_OFFICE_AML_PAYMENT_COIN must be a positive integer");
+  }
 
   return {
     port,
@@ -26,7 +30,8 @@ export function loadConfig(env = process.env) {
     secretKey: required("CRYPTO_OFFICE_SECRET_KEY", env),
     internalApiKey: required("INTERNAL_API_KEY", env),
     apiBaseUrl: (env.CRYPTO_OFFICE_API_BASE_URL ?? "https://public.crypto-office.com/api").replace(/\/+$/, ""),
-    amlPath: env.CRYPTO_OFFICE_AML_PATH ?? "/aml/create",
+    amlPath: env.CRYPTO_OFFICE_AML_PATH ?? "/v1/aml/store",
     amlService,
+    amlPaymentCoin,
   };
 }

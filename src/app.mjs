@@ -58,7 +58,7 @@ export function createServer({ internalApiKey, client, logger = console }) {
 
       if (isResult) {
         const jobId = decodeURIComponent(resultMatch[1]);
-        if (!/^[A-Za-z0-9]+_[A-Za-z0-9_-]{8,200}$/.test(jobId)) {
+        if (!/^(?:[1-9][0-9]{0,19}|[A-Za-z0-9]+_[A-Za-z0-9_-]{8,200})$/.test(jobId)) {
           status = 400;
           return send(response, status, {
             error: "VALIDATION_ERROR",

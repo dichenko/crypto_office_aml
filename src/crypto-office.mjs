@@ -126,26 +126,31 @@ export function createCryptoOfficeClient(config) {
         const requestHash = hashBody?.data?.request_hash ?? hashBody?.request_hash;
         if (!requestHash) throw new ProviderError("Provider response has no request hash");
 
-        await request(
+        const form = new FormData();
+        form.set("address", address);
+        form.set("blockchain", "tron");
+        form.set("balance_coin", "1");
+        form.set("service", config.amlService);
+        form.set("request_hash", requestHash);
+        form.set("payment_coin", String(config.amlPaymentCoin));
+
+        const createResult = await request(
           `${config.apiBaseUrl}${config.amlPath}`,
           {
             method: "POST",
             headers: {
               Accept: "application/json",
-              "Content-Type": "application/json",
               Authorization: auth,
             },
-            body: JSON.stringify({
-              address,
-              blockchain: "tron",
-              balance_coin: 1,
-              service: config.amlService,
-              request_hash: requestHash,
-            }),
+            body: form,
           },
           config.timeoutMs,
         );
-        return requestHash;
+        const amlId = createResult?.data?.id;
+        if (amlId === undefined || amlId === null) {
+          throw new ProviderError("Provider response has no AML check ID");
+        }
+        return String(amlId);
       } catch (error) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError(
@@ -157,9 +162,9 @@ export function createCryptoOfficeClient(config) {
 
     async getResult(requestHash) {
       try {
-        const resultUrl = new URL(`${config.apiBaseUrl}/aml`);
-        resultUrl.searchParams.set("hash", requestHash);
-        resultUrl.searchParams.set("request_hash", requestHash);
+        const resultUrl = new URL(
+          `${config.apiBaseUrl}/v1/aml/${encodeURIComponent(requestHash)}/show`,
+        );
         const result = await request(
           resultUrl,
           {
@@ -170,8 +175,8 @@ export function createCryptoOfficeClient(config) {
           },
           config.timeoutMs,
         );
-        const operation = findOperation(result, requestHash);
-        const providerStatus = Number(operation?.status ?? result?.data?.status);
+        const operation = result?.data ?? findOperation(result, requestHash);
+        const providerStatus = Number(operation?.status);
         return {
           done: providerStatus === 50 || providerStatus === 40,
           providerStatus: Number.isNaN(providerStatus) ? null : providerStatus,
