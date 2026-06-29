@@ -86,7 +86,7 @@ export function createCryptoOfficeClient(config) {
               address,
               blockchain: "tron",
               balance_coin: 1,
-              service: "bitok",
+              service: config.amlService,
               txid: null,
               request_hash: requestHash,
             }),
