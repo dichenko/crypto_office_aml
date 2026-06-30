@@ -16,6 +16,9 @@ cp .env.example .env
 
 Заполните `CRYPTO_OFFICE_PUBLIC_KEY`, `CRYPTO_OFFICE_SECRET_KEY` и
 `INTERNAL_API_KEY`. В каждом запросе обязательны `blockchain` и `coin`.
+Поле `check_type` обязательно и принимает `address` или `transaction`.
+Для проверки транзакции дополнительно обязателен `txid`; Crypto Office также
+требует `address` кошелька, относящегося к транзакции.
 Поддерживаются комбинации:
 
 - `TRX` + `TRX` или `USDT`;
@@ -62,12 +65,25 @@ docker run --rm --network n8n_default curlimages/curl:8.12.1 \
   -X POST http://crypto-office-aml-api:8000/v1/aml/check \
   -H 'Content-Type: application/json' \
   -H 'X-Internal-Api-Key: replace-with-INTERNAL_API_KEY' \
-  -d '{"address":"TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z","blockchain":"TRX","coin":"USDT","payment_coin":1}'
+  -d '{"check_type":"address","address":"TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z","blockchain":"TRX","coin":"USDT","payment_coin":1}'
 ```
 
 `payment_coin` необязателен и задаёт валюту оплаты проверки по идентификатору
 Crypto Office. Если поле отсутствует, используется
 `CRYPTO_OFFICE_AML_PAYMENT_COIN` из `.env`.
+
+Проверка транзакции:
+
+```json
+{
+  "check_type": "transaction",
+  "address": "0x...",
+  "txid": "0x...",
+  "blockchain": "ETH",
+  "coin": "USDT",
+  "payment_coin": 1
+}
+```
 
 Ответ создания имеет HTTP-статус `202`:
 

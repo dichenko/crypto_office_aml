@@ -35,7 +35,12 @@ test("validates address and blockchain", async () => {
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
-    body: JSON.stringify({ address: "abc", blockchain: "ETH", coin: "BTC" }),
+    body: JSON.stringify({
+      address: "abc",
+      check_type: "address",
+      blockchain: "ETH",
+      coin: "BTC",
+    }),
   });
   assert.equal(response.status, 400);
 });
@@ -47,6 +52,7 @@ test("creates an asynchronous AML job", async () => {
       blockchain: "tron",
       balanceCoin: 1,
       paymentCoin: 3,
+      txid: undefined,
     });
     return "m_abcdefgh";
   }, getResult: async () => assert.fail("result called") });
@@ -55,6 +61,7 @@ test("creates an asynchronous AML job", async () => {
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
     body: JSON.stringify({
       address: "TXL9Qc9ZAaxFFTR6DPqwGCeKpSgGyXxA1z",
+      check_type: "address",
       blockchain: "TRX",
       coin: "USDT",
       payment_coin: 3,
@@ -72,13 +79,59 @@ test("maps provider errors to 502", async () => {
   const response = await fetch(`${base}/v1/aml/check`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
-    body: JSON.stringify({ address: "address", blockchain: "BTC", coin: "BTC" }),
+    body: JSON.stringify({
+      address: "address",
+      check_type: "address",
+      blockchain: "BTC",
+      coin: "BTC",
+    }),
   });
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), {
     error: "CRYPTO_OFFICE_ERROR",
     message: "AML provider request failed",
   });
+});
+
+test("creates a transaction AML check with txid", async () => {
+  const base = await start({
+    createCheck: async (params) => {
+      assert.equal(params.address, "0xwallet");
+      assert.equal(params.txid, "0xtransaction");
+      assert.equal(params.blockchain, "eth");
+      assert.equal(params.balanceCoin, 3);
+      return "12345";
+    },
+    getResult: async () => assert.fail("result called"),
+  });
+  const response = await fetch(`${base}/v1/aml/check`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
+    body: JSON.stringify({
+      check_type: "transaction",
+      address: "0xwallet",
+      txid: "0xtransaction",
+      blockchain: "ETH",
+      coin: "USDT",
+    }),
+  });
+  assert.equal(response.status, 202);
+});
+
+test("requires txid for transaction checks", async () => {
+  const base = await start();
+  const response = await fetch(`${base}/v1/aml/check`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-internal-api-key": "secret" },
+    body: JSON.stringify({
+      check_type: "transaction",
+      address: "wallet",
+      blockchain: "BTC",
+      coin: "BTC",
+    }),
+  });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).message, /txid/);
 });
 
 test("returns pending job status", async () => {

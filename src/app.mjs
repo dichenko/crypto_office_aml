@@ -111,7 +111,30 @@ export function createServer({ internalApiKey, client, logger = console }) {
       address = typeof body.address === "string" ? body.address.trim() : "";
       if (!address) {
         status = 400;
-        return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'address' is required" });
+          return send(response, status, { error: "VALIDATION_ERROR", message: "Field 'address' is required" });
+      }
+      const checkType = String(body.check_type ?? "").trim().toLowerCase();
+      if (!["address", "transaction"].includes(checkType)) {
+        status = 400;
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Field 'check_type' must be 'address' or 'transaction'",
+        });
+      }
+      const txid = typeof body.txid === "string" ? body.txid.trim() : "";
+      if (checkType === "transaction" && !txid) {
+        status = 400;
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Field 'txid' is required for transaction checks",
+        });
+      }
+      if (checkType === "address" && body.txid !== undefined) {
+        status = 400;
+        return send(response, status, {
+          error: "VALIDATION_ERROR",
+          message: "Field 'txid' is not allowed for address checks",
+        });
       }
       const blockchain = String(body.blockchain ?? "").trim().toUpperCase();
       const coin = String(body.coin ?? "").trim().toUpperCase();
@@ -148,6 +171,7 @@ export function createServer({ internalApiKey, client, logger = console }) {
           blockchain: mapping.blockchain,
           balanceCoin: mapping.balanceCoin,
           paymentCoin,
+          txid: checkType === "transaction" ? txid : undefined,
         });
         status = 202;
         logger.info(JSON.stringify({
